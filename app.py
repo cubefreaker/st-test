@@ -130,18 +130,18 @@ if __name__ == "__main__":
                 resp_query = get_gemini_response(question, to_sql_prompt)
                 resp_query = resp_query.replace('```sql', '').replace('```', '').strip()
                 # print('Query: ', resp_query, '\n')
-                try:
-                    result_query = get_data_from_db(resp_query)
-                    final_question = f"""
-                        Pertanyaan: {question}
-                        Query: {resp_query}
-                        Hasil: {str(result_query)}
-                    """
-                    # print(final_question, '\n')
+                # try:
+                result_query = get_data_from_db(resp_query)
+                final_question = f"""
+                    Pertanyaan: {question}
+                    Query: {resp_query}
+                    Hasil: {str(result_query)}
+                """
+                # print(final_question, '\n')
 
-                    resp_final = get_gemini_response(final_question, from_sql_prompt)
-                except:
-                    resp_final = resp_query
+                resp_final = get_gemini_response(final_question, from_sql_prompt)
+                # except:
+                #     resp_final = resp_query
 
                 # print('Final Result: ', resp_final, '\n')
             st.markdown(resp_final)
