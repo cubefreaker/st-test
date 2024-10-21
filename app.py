@@ -29,11 +29,13 @@ def get_gemini_response(question, prompt):
     return response.text
 
 def auth_data():
-    token = st.query_params.t
-    try:    
-        data = jwt.decode(token, os.environ.get("JWT_KEY"), algorithms=["HS256"])
-    except:
-        data = None
+    data = None
+    if 't' in st.query_params:
+        token = st.query_params.t
+        try:    
+            data = jwt.decode(token, os.environ.get("JWT_KEY"), algorithms=["HS256"])
+        except:
+            pass
     return data
 
 def show_chat_page():
@@ -158,7 +160,7 @@ def show_chat_page():
 
 def show_unauth_page():
     st.write("Page Not Found!")
-    
+
 if __name__ == "__main__":
     data = auth_data()
     if data:
