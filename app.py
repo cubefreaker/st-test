@@ -1,4 +1,4 @@
-import os
+import os, jwt
 import streamlit as st
 import mysql.connector
 import vertexai
@@ -28,7 +28,15 @@ def get_gemini_response(question, prompt):
     response = model.generate_content([prompt, question])
     return response.text
 
-if __name__ == "__main__":
+def auth_data():
+    token = st.query_params.t
+    try:    
+        data = jwt.decode(token, os.environ.get("JWT_KEY"), algorithms=["HS256"])
+    except:
+        data = None
+    return data
+
+def show_chat_page():
     PROJECT_ID = os.environ.get("GCP_PROJECT")
     LOCATION = os.environ.get("GCP_REGION")
 
@@ -130,21 +138,30 @@ if __name__ == "__main__":
                 resp_query = get_gemini_response(question, to_sql_prompt)
                 resp_query = resp_query.replace('```sql', '').replace('```', '').strip()
                 # print('Query: ', resp_query, '\n')
-                # try:
-                result_query = get_data_from_db(resp_query)
-                final_question = f"""
-                    Pertanyaan: {question}
-                    Query: {resp_query}
-                    Hasil: {str(result_query)}
-                """
-                # print(final_question, '\n')
+                try:
+                    result_query = get_data_from_db(resp_query)
+                    final_question = f"""
+                        Pertanyaan: {question}
+                        Query: {resp_query}
+                        Hasil: {str(result_query)}
+                    """
+                    # print(final_question, '\n')
 
-                resp_final = get_gemini_response(final_question, from_sql_prompt)
-                # except:
-                #     resp_final = resp_query
+                    resp_final = get_gemini_response(final_question, from_sql_prompt)
+                except:
+                    resp_final = resp_query
 
                 # print('Final Result: ', resp_final, '\n')
             st.markdown(resp_final)
 
         st.session_state.messages.append({"role": "assistant", "content": resp_final})
+
+def show_unauth_page():
+    st.write("Page Not Found!")
     
+if __name__ == "__main__":
+    data = auth_data()
+    if data:
+        show_chat_page()
+    else:
+        show_unauth_page()
