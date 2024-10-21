@@ -99,26 +99,6 @@ def show_chat_page():
         3. Jika ada nominal angka terkait penjualan, pakai format penulisan kurs mata uang
     """
 
-    st.set_page_config(page_title="Opsifin Bot")
-    # st.header("Opsifin personal assistant")
-
-    st.markdown("""
-        <style>
-            header {
-                visibility: hidden;
-            }
-            
-            .stMainBlockContainer, .stChatMessage {
-                width: 100%;
-                padding: 10px 0;
-            }
-                
-            .st-emotion-cache-1c7y2kd {
-                flex-direction: row-reverse;
-            }
-        </style>
-    """, unsafe_allow_html=True)
-
     # Initialize chat history
     if "messages" not in st.session_state:
         st.session_state.messages = []
@@ -162,7 +142,28 @@ def show_unauth_page():
     st.write("Page Not Found!")
 
 if __name__ == "__main__":
+    st.set_page_config(page_title="Opsifin Bot")
+    # st.header("Opsifin personal assistant")
+
+    st.markdown("""
+        <style>
+            header {
+                visibility: hidden;
+            }
+            
+            .stMainBlockContainer, .stChatMessage {
+                width: 100%;
+                padding: 10px 0;
+            }
+                
+            .st-emotion-cache-1c7y2kd {
+                flex-direction: row-reverse;
+            }
+        </style>
+    """, unsafe_allow_html=True)
+
     data = auth_data()
+    
     if data:
         show_chat_page()
     else:
