@@ -1,5 +1,6 @@
-﻿streamlit
-google-cloud-aiplatform
-google-cloud-logging
-mysql-connector-python
 pyjwt
+streamlit
+google-cloud-logging
+google-cloud-bigquery
+google-cloud-aiplatform
+mysql-connector-python
