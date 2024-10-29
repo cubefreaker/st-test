@@ -1,6 +1,6 @@
 pyjwt
 streamlit
 google-cloud-logging
-google-cloud-bigquery
+google-cloud-bigquery[bqstorage,pandas]
 google-cloud-aiplatform
 mysql-connector-python
