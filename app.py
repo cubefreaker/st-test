@@ -1,27 +1,35 @@
 import os, jwt
 import streamlit as st
+from google.cloud import bigquery
 import mysql.connector
 import vertexai
 from vertexai.generative_models import GenerativeModel
 
-def get_db_connection():
-    conn = mysql.connector.connect(
-        host=os.environ.get("QA_DB_HOST"),
-        user=os.environ.get("QA_DB_USER"),
-        password=os.environ.get("QA_DB_PASS"),
-        database=os.environ.get("QA_DB_NAME"),
-        port=os.environ.get("QA_DB_PORT")
-    )
-    return conn
+PROJECT_ID = os.environ.get("GCP_PROJECT")
+LOCATION = os.environ.get("GCP_REGION")
+
+# def get_db_connection():
+#     conn = mysql.connector.connect(
+#         host=os.environ.get("QA_DB_HOST"),
+#         user=os.environ.get("QA_DB_USER"),
+#         password=os.environ.get("QA_DB_PASS"),
+#         database=os.environ.get("QA_DB_NAME"),
+#         port=os.environ.get("QA_DB_PORT")
+#     )
+#     return conn
 
 def get_data_from_db(query):
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(query)
-    rows = cursor.fetchall()
-    cursor.close()
-    conn.close()
-    return rows
+    client = bigquery.Client()
+    return client.query(query, project=PROJECT_ID).to_dataframe()
+
+# def get_data_from_db(query):
+#     conn = get_db_connection()
+#     cursor = conn.cursor()
+#     cursor.execute(query)
+#     rows = cursor.fetchall()
+#     cursor.close()
+#     conn.close()
+#     return rows
 
 def get_gemini_response(question, prompt):
     model = GenerativeModel('gemini-pro')
@@ -39,17 +47,14 @@ def auth_data():
     return data
 
 def show_chat_page():
-    PROJECT_ID = os.environ.get("GCP_PROJECT")
-    LOCATION = os.environ.get("GCP_REGION")
-
     vertexai.init(project=PROJECT_ID, location=LOCATION)
 
-    to_sql_prompt = """
+    to_sql_prompt = f"""
         Kamu adalah seorang expert dalam mengubah pertanyaan dalam bahasa indonesia menjadi query MYSQL!
         
         Jika pertanyaan tidak ada hubungannya dengan konteks data maka kamu akan menjawab: "Maaf, saya hanya bisa menjawab pertanyaan mengenai data penjualan invoice"
 
-        Kamu diberikan tabel dengan nama tbl_invoice yang mempunyai kolom sebagai berikut:
+        Kamu diberikan tabel dengan nama {os.environ.get('TABLE_SOURCE')} yang mempunyai kolom sebagai berikut:
         - product (tipe atau nama produk)
         - invoice_no (nomor invoice)
         - inv_date (tanggal invoice dibuat)
@@ -61,35 +66,35 @@ def show_chat_page():
 
         Contoh:
         1.  Pertanyaan: Berapa jumlah total invoice keseluruhan?
-            Query: SELECT COUNT(*) FROM tbl_invoice
+            Query: SELECT COUNT(*) FROM {os.environ.get('TABLE_SOURCE')}
         2.  Pertanyaan: Berapa Jumlah customer atau pelanggan dari semua invoice?
-            Query: SELECT COUNT(*) FROM tbl_invoice GROUP BY customer_name
+            Query: SELECT COUNT(*) FROM {os.environ.get('TABLE_SOURCE')} GROUP BY customer_name
         3.  Pertanyaan: Berapa jumlah total penjualan pada bulan januari?
-            Query: SELECT SUM(sellprice) AS sellprice FROM tbl_invoice WHERE inv_date BETWEEN '2024-01-01' AND '2024-01-31'
+            Query: SELECT SUM(sellprice) AS sellprice FROM {os.environ.get('TABLE_SOURCE')} WHERE inv_date BETWEEN '2024-01-01' AND '2024-01-31'
         4.  Pertanyaan: Berapa penjualan dari customer Yokogawa Indonesia, PT?
-            Query: SELECT SUM(sellprice) AS sellprice FROM tbl_invoice WHERE customer_name = 'Yokogawa Indonesia, PT'
+            Query: SELECT SUM(sellprice) AS sellprice FROM {os.environ.get('TABLE_SOURCE')} WHERE customer_name = 'Yokogawa Indonesia, PT'
 
         Berikan hasil query sql tanpa tanda ``` dan juga tanpa penjelasan apapun, hanya kode sql nya saja!
     """
 
-    from_sql_prompt = """
+    from_sql_prompt = f"""
         Kamu adalah seorang expert dalam mengubah data dari hasil query database ke dalam bahasa indonesia!
 
         Contoh:
         1.  Pertanyaan: Berapa jumlah total invoice keseluruhan?
-            Query: SELECT COUNT(*) FROM tbl_invoice
+            Query: SELECT COUNT(*) FROM {os.environ.get('TABLE_SOURCE')}
             Hasil: [(1000,)]
             Jawaban: Jumlah total invoice keseluruhan adalah (Hasil) invoice
         2.  Pertanyaan: Berapa Jumlah customer atau pelanggan dari semua invoice?
-            Query: SELECT COUNT(*) FROM tbl_invoice GROUP BY customer_name
+            Query: SELECT COUNT(*) FROM {os.environ.get('TABLE_SOURCE')} GROUP BY customer_name
             Hasil: [(1000,)]
             Jawaban: Jumlah total customer atau pelanggan yang terdapat pada invoice adalah (Hasil) customer
         3.  Pertanyaan: Berapa jumlah total penjualan pada bulan januari?
-            Query: SELECT SUM(sellprice) AS sellprice FROM tbl_invoice WHERE inv_date BETWEEN '2024-01-01' AND '2024-01-31'
+            Query: SELECT SUM(sellprice) AS sellprice FROM {os.environ.get('TABLE_SOURCE')} WHERE inv_date BETWEEN '2024-01-01' AND '2024-01-31'
             Hasil: [(1000,)]
             Jawaban: Jumlah total penjualan pada bulan januari tahun [tahun] adalah Rp. (Hasil dalam format kurs)
         4.  Pertanyaan: Berapa penjualan dari customer Yokogawa Indonesia, PT?
-            Query: SELECT SUM(sellprice) AS sellprice FROM tbl_invoice WHERE customer_name = 'Yokogawa Indonesia, PT'
+            Query: SELECT SUM(sellprice) AS sellprice FROM {os.environ.get('TABLE_SOURCE')} WHERE customer_name = 'Yokogawa Indonesia, PT'
             Hasil: [(1000,)]
             Jawaban: Jumlah total penjualan dari customer Yokogawa Indonesia, PT adalah Rp. (Hasil dalam format kurs)
         
