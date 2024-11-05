@@ -1,4 +1,4 @@
-import os, jwt
+import os, jwt, requests
 import vertexai
 from vertexai.generative_models import GenerativeModel
 from google.cloud import bigquery
@@ -6,6 +6,7 @@ import streamlit as st
 
 PROJECT_ID = os.getenv("GCP_PROJECT")
 LOCATION = os.getenv("GCP_REGION")
+API_KEY = os.getenv('API_SECRET_KEY')
 
 def get_data_from_db(query):
     client = bigquery.Client()
@@ -21,10 +22,29 @@ def auth_data():
     if 't' in st.query_params:
         token = st.query_params.t
         try:    
-            data = jwt.decode(token, os.getenv("JWT_KEY"), algorithms=["HS256"])
+            decoded_token = jwt.decode(token, os.getenv("JWT_KEY"), algorithms=["HS256"])
+            data = check_data(decoded_token)
         except:
             pass
     return data
+
+def check_data(data):
+    result = None
+    try:
+        url = f"{data['iss']}api/checkUserLoginToken"
+        headers = {
+            "Content-Type": "application/json",
+            "Secret": API_KEY
+        }
+        payload = {
+            "userid": data['userid']
+        }
+        response = requests.post(url, headers=headers, json=payload).json()
+        result = response['data']
+    except:
+        pass
+
+    return result
 
 def show_chat_page():
     vertexai.init(project=PROJECT_ID, location=LOCATION)
@@ -151,7 +171,9 @@ if __name__ == "__main__":
 
     data = auth_data()
     
-    if data:
+    if not data:
+        show_unauth_page()
+    elif data['has_access']:
         show_chat_page()
     else:
         show_unauth_page()
