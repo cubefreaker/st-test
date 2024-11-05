@@ -23,8 +23,10 @@ def auth_data():
         token = st.query_params.t
         try:    
             decoded_token = jwt.decode(token, os.getenv("JWT_KEY"), algorithms=["HS256"])
-            data = check_data(decoded_token)
+            if decoded_token['access_chatbot'] == 'True':
+                data = check_data(decoded_token)
         except:
+            print('error')
             pass
     return data
 
@@ -40,6 +42,7 @@ def check_data(data):
             "userid": data['userid']
         }
         response = requests.post(url, headers=headers, json=payload).json()
+        print(response)
         result = response['data']
     except:
         pass
