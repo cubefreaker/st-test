@@ -1,8 +1,11 @@
 import os, jwt, requests
+import prompts
 import vertexai
 from vertexai.generative_models import GenerativeModel
 from google.cloud import bigquery
 import streamlit as st
+from dotenv import load_dotenv
+load_dotenv()
 
 PROJECT_ID = os.getenv("GCP_PROJECT")
 LOCATION = os.getenv("GCP_REGION")
@@ -52,61 +55,8 @@ def check_data(data):
 def show_chat_page():
     vertexai.init(project=PROJECT_ID, location=LOCATION)
 
-    to_sql_prompt = f"""
-        Kamu adalah seorang expert dalam mengubah pertanyaan dalam bahasa indonesia menjadi query MYSQL!
-        
-        Jika pertanyaan tidak ada hubungannya dengan konteks data maka kamu akan menjawab: "Maaf, saya hanya bisa menjawab pertanyaan mengenai data penjualan invoice"
-
-        Kamu diberikan tabel dengan nama `{os.getenv('TABLE_SOURCE')}` yang mempunyai kolom sebagai berikut:
-        - product (tipe atau nama produk)
-        - invoice_no (nomor invoice)
-        - inv_date (tanggal invoice dibuat)
-        - due_date (tenggat waktu pembayaran invoice)
-        - customer_name (nama customer)\
-        - sellprice (harga jual)
-        - outstanding (sisa pembayaran)
-        - payment_status (status pembayaran)
-
-        Contoh:
-        1.  Pertanyaan: Berapa jumlah total invoice keseluruhan?
-            Query: SELECT COUNT(*) FROM `{os.getenv('TABLE_SOURCE')}`
-        2.  Pertanyaan: Berapa Jumlah customer atau pelanggan dari semua invoice?
-            Query: SELECT COUNT(*) FROM `{os.getenv('TABLE_SOURCE')}` GROUP BY customer_name
-        3.  Pertanyaan: Berapa jumlah total penjualan pada bulan januari?
-            Query: SELECT SUM(sellprice) AS sellprice FROM `{os.getenv('TABLE_SOURCE')}` WHERE inv_date BETWEEN '2024-01-01' AND '2024-01-31'
-        4.  Pertanyaan: Berapa penjualan dari customer Yokogawa Indonesia, PT?
-            Query: SELECT SUM(sellprice) AS sellprice FROM `{os.getenv('TABLE_SOURCE')}` WHERE customer_name = 'Yokogawa Indonesia, PT'
-
-        Berikan hasil query sql tanpa tanda ``` dan juga tanpa penjelasan apapun, hanya kode sql nya saja!
-        Wrap nama tabel dengan tanda `, contohnya `nama-project.nama_table`
-    """
-
-    from_sql_prompt = f"""
-        Kamu adalah seorang expert dalam mengubah data dari hasil query database ke dalam bahasa indonesia!
-
-        Contoh:
-        1.  Pertanyaan: Berapa jumlah total invoice keseluruhan?
-            Query: SELECT COUNT(*) FROM `{os.getenv('TABLE_SOURCE')}`
-            Hasil: [(1000,)]
-            Jawaban: Jumlah total invoice keseluruhan adalah (Hasil) invoice
-        2.  Pertanyaan: Berapa Jumlah customer atau pelanggan dari semua invoice?
-            Query: SELECT COUNT(*) FROM `{os.getenv('TABLE_SOURCE')}` GROUP BY customer_name
-            Hasil: [(1000,)]
-            Jawaban: Jumlah total customer atau pelanggan yang terdapat pada invoice adalah (Hasil) customer
-        3.  Pertanyaan: Berapa jumlah total penjualan pada bulan januari?
-            Query: SELECT SUM(sellprice) AS sellprice FROM `{os.getenv('TABLE_SOURCE')}` WHERE inv_date BETWEEN '2024-01-01' AND '2024-01-31'
-            Hasil: [(1000,)]
-            Jawaban: Jumlah total penjualan pada bulan januari tahun [tahun] adalah Rp. (Hasil dalam format kurs)
-        4.  Pertanyaan: Berapa penjualan dari customer Yokogawa Indonesia, PT?
-            Query: SELECT SUM(sellprice) AS sellprice FROM `{os.getenv('TABLE_SOURCE')}` WHERE customer_name = 'Yokogawa Indonesia, PT'
-            Hasil: [(1000,)]
-            Jawaban: Jumlah total penjualan dari customer Yokogawa Indonesia, PT adalah Rp. (Hasil dalam format kurs)
-        
-        Peraturan jawaban:
-        1. Berikan hasil dalam satu kalimat ringkas dan jelas sesuai dengan konteks pertanyaan dan contoh jawaban
-        2. Jangan ada informasi terkait query maupun nama tabel!
-        3. Jika ada nominal angka terkait penjualan, pakai format penulisan kurs mata uang
-    """
+    to_sql_prompt = prompts.text_to_sql(os.getenv('TABLE_SOURCE'))
+    from_sql_prompt = prompts.sql_to_text(os.getenv('TABLE_SOURCE'))
 
     # Initialize chat history
     if "messages" not in st.session_state:
@@ -130,18 +80,18 @@ def show_chat_page():
                 print(resp_query)
                 resp_query = resp_query.replace('```sql', '').replace('```', '').strip()
                 # print('Query: ', resp_query, '\n')
-                # try:
-                result_query = get_data_from_db(resp_query)
-                final_question = f"""
-                    Pertanyaan: {question}
-                    Query: {resp_query}
-                    Hasil: {str(result_query)}
-                """
-                # print(final_question, '\n')
+                try:
+                    result_query = get_data_from_db(resp_query)
+                    final_question = f"""
+                        Pertanyaan: {question}
+                        Query: {resp_query}
+                        Hasil: {str(result_query)}
+                    """
+                    # print(final_question, '\n')
 
-                resp_final = get_gemini_response(final_question, from_sql_prompt)
-                # except:
-                #     resp_final = resp_query
+                    resp_final = get_gemini_response(final_question, from_sql_prompt)
+                except:
+                    resp_final = resp_query
 
                 # print('Final Result: ', resp_final, '\n')
             st.markdown(resp_final)
